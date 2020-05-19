@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# the shell scirpt is used to generate the psf and coor file from the pdb file using the CHRAMM software.
+# Author: Chao Yin (chaoy@smu.edu)
+# Starting Date: May 18 2020
+
+# load the charmm moudle first
+
+module load charmm
+
+if [ $# -lt 3 ];
+    then
+	echo "Usage: PCFile_Generator InputFileName(without .pdb suffix) OutputFileName(without suffix) reoffset"
+	exit 1
+fi
+
+# generate the title of charmm scipt firstly
+echo "* Make psf and coor file from pdb." > t1
+echo "*" >> t1
+echo ""  >> t1
+
+# set the print level and bom level, you can modify its value depending on your situation.
+echo "prnlev 9 node 0 " >> t1 
+echo "bomlev 0" >> t1
+echo "ioform extend" >> t1
+echo ""    >> t1
+
+# set some variables using in the charmm
+#The FIRSt and LAST specifications define what patch-residues should be used for the terminating residues. If no specification is given,then the default patching as specified in the topology file will be used.
+echo "set inpdb $1" >> t1
+echo "set outname $2" >> t1
+echo "set firstres none" >> t1 
+echo "set lastres  none" >> t1
+echo "set angldihe noan nodi" >> t1
+echo "set resoffset $3" >> t1 
+echo "" >> t1
+
+# read force filed form specificed folder
+echo "!{ read force field }" >> t1
+echo "stream /users/chaoy/scratch/charmmlearning/x.forcefield/readff.strm" >> t1 # you should change the path to your force field path.
+echo ""  >> t1  
+
+# read sequence form the pdb file 
+echo "! { read sequence }" >> t1
+echo "read sequence pdb name @inpdb.pdb" >> t1
+echo "generate A setup warn first @firstres last @lastres @angldihe" >> t1
+echo "" >> t1
+
+# read the coordinate 
+echo "! { read coor }" >> t1
+echo "read coor pdb offset @resoffset name @inpdb.pdb" >> t1
+echo "" >> t1
+
+# ic fixes 
+echo "! { ic fixes }" >> t1
+echo "IC paramter"  >> t1
+echo "IC build"  >> t1
+echo ""  >> t1
+
+
+# add H atoms , if the residue has no H atom, this step can be skipped 
+
+echo "! { add H atoms }" >> t1
+echo "coordiants initialize select TYPE H* end" >> t1
+echo "hbuild select TYPE H* end" >> t1
+echo "" >> t1
+
+# write the psf and coor file 
+echo "! { write psf and cor file}" >> t1
+echo "write psf card name @outname.psf" >> t1
+echo "write coor card name @outname.cor" >> t1
+echo "" >> t1
+
+# stop
+echo "stop" >> t1 
+
+# run the charmm program to generate the psf and cor file 
+/hpc/applications/charmm/c41b1/charmm_m_mpich < t1 > t2
+
+# determining whether the Charmmm NORMAL TERMINATION BY NORMAL STOP 
+Nor_Term=$(grep "NORMAL TERMINATION BY NORMAL STOP" t2 ) # be carful, no space between the equal sign.
+
+if [ ! -n "$Nor_Term" ]; 
+    then
+    echo "ABNORMAL TERMINATION!\n"
+    echo "Please check the log file to fix the issue."
+else
+    rm t1 t2 # if CHARMM terminates normally, remove the temporary file t1 and t2 
+fi
+
+
+    
+    
+
+
+
+
+
+
